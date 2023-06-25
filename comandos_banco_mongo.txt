@@ -1,0 +1,244 @@
+use PizzariaDB;
+
+db.createCollection("Client");
+db.createCollection("Order");
+db.createCollection("Pizza");
+db.createCollection("Topping");
+^---- Criar as collections
+v---- Inserir os dados
+db.Topping.insertMany([
+    {
+    "pepperoni":
+        {
+            "qtt_pep_g":45,
+            "qtt_ore_g":60,
+            "qtt_che_g":100,
+            "qtt_sau_ml":200
+        }
+    },{
+    "margherita":
+        {
+            "qtt_tom_g":120,
+            "qtt_oil_ml":33,
+            "qtt_ore_g":40,
+            "qtt_che_g":100,
+            "qtt_man_g":10,
+            "qtt_sau_ml":150
+        }
+    }
+]);
+db.Pizza.insertMany([
+    {
+        "name_size":"small",
+        "price_size":25.00,
+        "toppings_size":1
+    },{
+        "name_size":"medium",
+        "price_size":43.00,
+        "toppings_size":2
+    }
+]);
+db.Client.insertMany([
+    {
+    "name":"Fulano",
+    "phone":"51912345678",
+    "address":[
+        {
+            "street":"Jolandia",
+            "number":47,
+            "neighborhood":"Palio Baixo",
+            "comp.":"ap 202"
+        }]
+    },{
+    "name":"Deutrano",
+    "phone":"48948651239",
+    "address":[
+        {
+            "street":"Alamanda Madeira",
+            "number":508,
+            "neighborhood":"Voa Hora",
+            "comp.":"casa vermelha"
+        }]
+    }
+]);
+db.Order.insertMany([
+    {
+    "client_id":ObjectId("6496fb03e5042a4f47d8659a"),
+    "date_order":"2023-06-23T22:58:49Z",
+    "value_order":59.70,
+    "is_delivery":true,
+    "num_table":null,
+    "deli_address":[
+        {
+            "street":"Outrarua",
+            "number":647,
+            "neighborhood":"Milvin Ct.",
+            "comp.":"apto. 505"
+        }],
+    "items":[{
+        "_id":"0002S0004",
+        "name_item":"Loco-Caca",
+        "type_item":2,
+        "price_item":10.80,
+        "qtt_item":1
+    },{
+        "_id":"0001P020012",
+        "name_item":"Pizza",
+        "type_item":1,
+        "price_item":48.90,
+        "qtt_item":1,
+        "has_stuff_crust":true,
+        "size_pizza":[{
+            "name_size":"medium",
+            "price_size":43.00,
+            "toppings_size":2
+        }],
+        "toppings_pizza":[
+            "pepperoni",
+            "margherita"
+        ]
+    }]
+},{
+    "client_id":ObjectId("6496fb03e5042a4f47d8659b"),
+    "date_order":"2023-06-23T22:58:49Z",
+    "value_order":34.00,
+    "is_delivery":false,
+    "num_table":7,
+    "deli_address":null,
+    "items":[{
+        "_id":"0004B0005",
+        "name_item":"Blisswasser",
+        "type_item":4,
+        "price_item":4.50,
+        "qtt_item":2
+    },{
+        "_id":"0001P010001",
+        "name_item":"Pizza",
+        "type_item":1,
+        "price_item":25.00,
+        "qtt_item":1,
+        "has_stuff_crust":false,
+        "size_pizza":[{
+            "name_size":"small",
+            "price_size":25.00,
+            "toppings_size":1
+        }],
+        "toppings_pizza":[
+            "pepperoni"
+        ]
+    }]
+}
+]);
+
+-- Atualizar e deletar
+    -- Atualizar os ingredientes de uma cobertura de pizza
+    -- Apagar Deutrano.
+db.Topping.updateOne(
+    {_id:ObjectId("6496f80be5042a4f47d86596")},
+    {$set:{
+        "pepperoni.qtt_pep_g":80,
+        "pepperoni.qtt_ore_g":50,
+        "pepperoni.qtt_che_g":120,
+        "pepperoni.qtt_sau_ml":200
+    }}
+)
+db.Client.deleteOne(
+    {"_id":ObjectId("6496fb03e5042a4f47d8659b")}
+)
+db.Order.find() -- Retorno dos pedidos, onde o segundo pedido ainda tem o Id do Deutrano embora esse não exista mais
+
+db.Topping.find() -- Isso seria consulta simples?
+db.Order.find({"client_id":ObjectId("6496fb03e5042a4f47d8659a")})
+db.Order.find({client_id: {$ne:ObjectId("6496fb03e5042a4f47d8659b")}})
+-- Retornar o cliente específico, retornar todos os clientes
+-- exceto aquele em específico
+
+-- Consulta por "join", retorna o nome/dados do cliente junto do pedido
+-- Ficou meio desordenado, mas retorna o esperado
+db.Order.aggregate([
+    {$lookup:
+        {
+            from:"Client",
+            localField:"client_id",
+            foreignField:"_id",
+            as: "clientePedido"
+        }
+    },
+    {$unwind: "$clientePedido"},
+    {$match:
+        {
+            "clientePedido._id":ObjectId("6496fb03e5042a4f47d8659a")
+        }
+    },
+    {$project:
+        {
+            "_id":1,
+            "clientePedido._id":1,
+            "clientePedido.name":1,
+            date_order:1,
+            value_order:1,
+            is_delivery:1,
+            num_table:1,
+            deli_address:1,
+            items:1
+        }
+    }
+])
+
+-- Consulta por GroupBy, retornar quanto que o cliente da id passada
+-- gastou no total na pizzaria, para tal será necessário inserir
+-- mais um pedido pelo cliente tal
+
+db.Order.insertOne({
+    "client_id":ObjectId("6496fb03e5042a4f47d8659a"),
+    "date_order":"2023-06-24T12:08:49Z",
+    "value_order":10.80,
+    "is_delivery":false,
+    "num_table":1,
+    "deli_address":null,
+    "items":[{
+        "_id":"0002S0007",
+        "name_item":"Guarana Jesus",
+        "type_item":2,
+        "price_item":10.80,
+        "qtt_item":1
+    }]
+});
+
+db.Order.aggregate([
+    {$match:
+        {
+            client_id:ObjectId("6496fb03e5042a4f47d8659a")
+        },
+    },
+    {$group:
+        {
+            _id: "$client_id",
+            total_spent: {$sum:"$value_order"}
+        }
+    }
+]);
+
+-- Índices nos "sabores" de pizza
+-- uma vez que as pizzas propriamente dita não podem existir
+-- sem um sabor, facilita o acesso, bem como caso exista uma
+-- pesquisa, para retornar os "sabores mais populares", ou algo
+-- assim, é conveniente que esteja indexado
+db.Topping.createIndex({"pepperoni":1})
+db.Topping.createIndex({"margherita":1})
+-- Índices nos nomes dos usuários, para pesquisas referentes
+-- ao usuário, uma vez que já existe o índice de id
+-- tal qual em endereço, uma vez que podem haver vários pedidos
+-- desse cliente, em diferentes locais, e como endereço é um
+-- "dado grande", indexar ajuda a recuperar melhor
+db.Client.createIndex({"name":1})
+db.Client.createIndex({"address":1})
+-- Índice apenas no custo do tamanho da pizza, já que é 
+-- utilizado para calcular o valor
+db.Pizza.createIndex({"price_size":1})
+-- Índices no valor total do pedido e na data do pedido,
+-- já que estes podem ser chamados, como no caso do join, para ver
+-- quanto tal cliente gastou ao total na pizzaria, ou ainda
+-- dentro de um período de tempo
+db.Order.createIndex({"date_order":1})
+db.Order.createIndex({"value_order":1})
